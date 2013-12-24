@@ -10,12 +10,12 @@
 #
 # Example usage:
 #
-#                 PDFToTextFile.process_pdf('/home/user/sample.pdf')
-#                 PDFToTextFile.process_dir('/home/user/myPDFs/')
+#   PDFToTextFile.process_pdf('/home/user/sample.pdf')
+#   PDFToTextFile.process_dir('/home/user/myPDFs/')
 #
 # Options:
 #
-#           logger  -  If specified, this is the location where a log file
+#         log_file  -  If specified, this is the location where a log file
 #                      will be placed, tracking the process.
 #
 #        text_dest  -  If specified, this is the directory where the resulting
@@ -50,20 +50,44 @@ module PDFToTextFile
                   text_dest:      'text_dest',
                   arhive_dest:    'archive_dest',
                   arhive_dir_dup: 'archive_dir_dup',
-                  logger:         'logger' }
+                  log_file:       'log_file' }
 
-  attr_accessor :pdf_source, :options
+  attr_accessor :pdf_source, :options, :logger
 
   def process_pdf(pdf_source, options = {})
     @pdf_source = pdf_source
     @options = options
-    process_with_options
+    validate_pdf_options
+    process_pdf_with_options
   end
 
   def process_dir(pdf_source, options = {}
     @pdf_source = pdf_source
     @options = options
+    validate_options
+    process_dir_with_options
   end
+
+  def validate_options
+    fail "Could not locate pdf_source: #{@pdf_source}" unless File.exists?(@pdf_source)
+    if !@options[:text_dest].nil? && !File.exists?(@options[:text_dest])
+      fail "Could not locate text_dest: #{@options[:text_dest]}"
+    end
+    if !@options[:archive_dest].nil? && !File.exists?(@options[:archive_dest])
+      fail "Could not locate archive_dest: #{@options[:archive_dest]}"
+    end
+    @logger = Logger.new(@options[:log_file]) unless @options[:log_file].nil?
+  end
+
+  def process_pdf_with_options
+    pdfs = gather_pdfs_from_base_directory
+    successfully_written_pdfs = write_pdfs_to_text_files(pdfs)
+    archive_select_files_from_dir(successfully_written_pdfs,
+                                  @config['process_queue_base_directory'],
+                                  @config['archive_base_directory'])
+  end
+
+
   def archive_select_files_from_dir(files, dir, archive)
     files.each do |file|
       archive_path = archive + get_file_subpath(dir, file)
@@ -134,14 +158,8 @@ module PDFToTextFile
     pdfs
   end
 
-  private
 
   def main
-    pdfs = gather_pdfs_from_base_directory
-    successfully_written_pdfs = write_pdfs_to_text_files(pdfs)
-    archive_select_files_from_dir(successfully_written_pdfs,
-                                  @config['process_queue_base_directory'],
-                                  @config['archive_base_directory'])
-  end
+ end
 
 end
