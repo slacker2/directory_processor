@@ -37,7 +37,6 @@
 #                      archive_dest.
 
 module PDFToTextFile
-
   include 'dir'
   include 'file'
   include 'fileutils'
@@ -57,18 +56,21 @@ module PDFToTextFile
   def process_pdf(pdf_source, options = {})
     @pdf_source = pdf_source
     @options = options
-    validate_pdf_options
-    process_pdf_with_options
+    validate_options
+    fail "File is not a pdf: #{@pdf_source}" unless File.extname(@pdf_source) == '.pdf'
+    process_pdf_with_options(@pdf_source)
   end
 
-  def process_dir(pdf_source, options = {}
+  def process_dir(pdf_source, options = {})
     @pdf_source = pdf_source
     @options = options
     validate_options
+    fail "Argument is not a directory: #{@pdf_source}" unless File.directory?(@pdf_source)
     process_dir_with_options
   end
 
   def validate_options
+    fail 'You must specify a filename or directory.' if @pdf_source.nil?
     fail "Could not locate pdf_source: #{@pdf_source}" unless File.exists?(@pdf_source)
     if !@options[:text_dest].nil? && !File.exists?(@options[:text_dest])
       fail "Could not locate text_dest: #{@options[:text_dest]}"
@@ -79,32 +81,33 @@ module PDFToTextFile
     @logger = Logger.new(@options[:log_file]) unless @options[:log_file].nil?
   end
 
-  def process_pdf_with_options
-    pdfs = gather_pdfs_from_base_directory
-    successfully_written_pdfs = write_pdfs_to_text_files(pdfs)
-    archive_select_files_from_dir(successfully_written_pdfs,
-                                  @config['process_queue_base_directory'],
-                                  @config['archive_base_directory'])
+  def process_pdf_with_options(pdf)
+    write_pdf_text(pdf)
+    archive_pdf(pdf) unless @options[:archive_dest].nil?
   end
 
-
-  def archive_select_files_from_dir(files, dir, archive)
-    files.each do |file|
-      archive_path = archive + get_file_subpath(dir, file)
-      FileUtils.mkdir_p(archive_path)
-      FileUtils.mv(file, archive_path)
-    end
+  def process_dir_with_options
+    pdfs = find_pdfs_in_dir(@pdf_source)
+    written_pdfs = write_pdfs_texts(pdfs)
+    @logger.debug("#{written_pdfs.size}/#{pdfs.size} pdfs written")
+    written_pdfs.each { |pdf| archive_pdf(pdf) }
   end
 
-  def write_pdfs_to_text_files(pdfs)
+  def archive_pdf(pdf)
+    archive_path = @options[:archive_dest] + pdf_subpath(pdf)
+    FileUtils.mkdir_p(archive_path)
+    FileUtils.mv(pdf, archive_path)
+  end
+
+  def write_pdfs_texts(pdfs)
     written_pdfs = []
     pdfs.each do |pdf|
       begin
         write_pdf_text(pdf)
         written_pdfs << pdf
       rescue StandardError => e
-        @logger.error("Can't process #{pdf}")
-        @logger.error(e)
+        raise e if @logger.nil?
+        @logger.error("Can't process #{pdf}\n#{e}")
       end
     end
     written_pdfs
@@ -126,40 +129,28 @@ module PDFToTextFile
   end
 
   def get_text_file(pdf)
-    text_file_path = @config['text_results_base_directory'] + get_file_subpath(@config['process_queue_base_directory'], pdf) + '/'
+    text_file_name = File.basename(pdf, '.pdf') + '.txt'
+    text_file_path = text_file_path(pdf)
     FileUtils.mkdir_p(text_file_path)
-    text_file = text_file_path + File.basename(pdf).split('.')[0] + '.txt'
+    text_file = text_file_path + '/' + text_file_name
     File.open(text_file, 'w')
   end
 
-  def get_file_subpath(origin_path, file_path)
-    origin_base = origin_path.split('/').last
-    if origin_base.empty? then fail "Cannot get subpath from: #{origin_path}" end
-    file_sub_path = file_path.split(origin_base)[1]
-    File.dirname(file_sub_path)
+  def text_file_path(pdf)
+    options[:text_dir].nil? ? File.dirname(pdf) : options[:text_dir] + pdf_subpath(pdf)
   end
 
-  def duplicate_subdirectory_structure(origin_dir, dest_dir)
-    origin_base = origin_dir.split('/').last
-    if original_base.empty? then fail "Cannot duplicate directory: #{original}" end
-      Find.find(original) do |path|
-        if File.directory?(path)
-          subdir = path.split(original_base)[1]
-          subdir.nil? ?  FileUtils.mkdir_p(copy + '/') : FileUtils.mkdir_p(copy + subdir)
-        end
-      end
+  def pdf_subpath(pdf)
+    return '/' if @options[:text_dir_dup] != true || pdf == @pdf_source
+    origin_base = File.basename(@pdf_source)
+    File.dirname(pdf).split(origin_base)[1] || '/'
   end
 
-  def gather_pdfs_from_base_directory
+  def find_pdfs_in_dir(dir)
     pdfs = []
-    Find.find(@config['process_queue_base_directory']) do |path|
+    Find.find(dir) do |path|
       pdfs << path if path.match(/.*\.pdf$/)
     end
     pdfs
   end
-
-
-  def main
- end
-
 end
