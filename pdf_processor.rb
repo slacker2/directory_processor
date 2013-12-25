@@ -15,44 +15,43 @@
 #
 # Options:
 #
-#         log_file  -  If specified, this is the location where a log file
-#                      will be placed, tracking the process.
+#          log_file  -  If specified, this is the location where a log file
+#                       will be placed, tracking the process.
 #
-#        text_dest  -  If specified, this is the directory where the resulting
-#                      text file(s) will be placed. If not specified, the
-#                      resulting text files will be placed in the same path as
-#                      the pdf(s)
+#         text_dest  -  If specified, this is the directory where the resulting
+#                       text file(s) will be placed. If not specified, the
+#                       resulting text files will be placed in the same path as
+#                       the pdf(s)
 #
-#     text_dir_dup  -  If set to true, and text_dest is specified and
-#                      process_dir is called, any subfolder structure in the
-#                      pdf_source directory will be duplicated in the text_dest
+#      text_dir_dup  -  If set to true, and text_dest is specified and
+#                       process_dir is called, any subfolder structure in the
+#                       pdf_source directory will be duplicated in the text_dest
 #
-#     archive_dest  -  If specified, this is the directory where the pdf(s)
-#                      will be moved to if they are successfully converted to
-#                      text files.
+#      archive_dest  -  If specified, this is the directory where the pdf(s)
+#                       will be moved to if they are successfully converted to
+#                       text files.
 #
-#   arhive_dir_dup  -  If set to true, and arhive_dest is specified and
-#                      process_dir is called, any subfolder structure in the
-#                      pdf_source directory will be duplicated in the
-#                      archive_dest.
+#   archive_dir_dup  -  If set to true, and arhive_dest is specified and
+#                       process_dir is called, any subfolder structure in the
+#                       pdf_source directory will be duplicated in the
+#                       archive_dest.
 
 module PDFToTextFile
-  include 'dir'
-  include 'file'
-  include 'fileutils'
-  include 'find'
-  include 'logger'
-  include 'pdf-reader'
-  include 'yaml'
+  require 'fileutils'
+  require 'find'
+  require 'logger'
+  require 'pdf-reader'
+  require 'yaml'
 
-  OPTION_KEYS = { text_dir_dup:   'text_dir_dup',
-                  text_dest:      'text_dest',
-                  arhive_dest:    'archive_dest',
-                  arhive_dir_dup: 'archive_dir_dup',
-                  log_file:       'log_file' }
+  OPTION_KEYS = { text_dir_dup:    'text_dir_dup',
+                  text_dest:       'text_dest',
+                  archive_dest:    'archive_dest',
+                  archive_dir_dup: 'archive_dir_dup',
+                  log_file:        'log_file' }
 
   attr_accessor :pdf_source, :options, :logger
 
+  module_function
   def process_pdf(pdf_source, options = {})
     @pdf_source = pdf_source
     @options = options
@@ -89,12 +88,12 @@ module PDFToTextFile
   def process_dir_with_options
     pdfs = find_pdfs_in_dir(@pdf_source)
     written_pdfs = write_pdfs_texts(pdfs)
-    @logger.debug("#{written_pdfs.size}/#{pdfs.size} pdfs written")
-    written_pdfs.each { |pdf| archive_pdf(pdf) }
+    @logger.debug("#{written_pdfs.size}/#{pdfs.size} pdfs written") unless @logger.nil?
+    written_pdfs.each { |pdf| archive_pdf(pdf) } unless @options[:archive_dest].nil?
   end
 
   def archive_pdf(pdf)
-    archive_path = @options[:archive_dest] + pdf_subpath(pdf)
+    archive_path = archive_file_path(pdf)
     FileUtils.mkdir_p(archive_path)
     FileUtils.mv(pdf, archive_path)
   end
@@ -136,12 +135,16 @@ module PDFToTextFile
     File.open(text_file, 'w')
   end
 
+  def archive_file_path(pdf)
+    @options[:archive_dir_dup] == true ? @options[:archive_dest] + pdf_subpath(pdf) : @options[:archive_dest]
+  end
+
   def text_file_path(pdf)
-    options[:text_dir].nil? ? File.dirname(pdf) : options[:text_dir] + pdf_subpath(pdf)
+    @options[:text_dest].nil? || @options[:text_dir_dup] != true ? File.dirname(pdf) : @options[:text_dest] + pdf_subpath(pdf)
   end
 
   def pdf_subpath(pdf)
-    return '/' if @options[:text_dir_dup] != true || pdf == @pdf_source
+    return '/' if pdf == @pdf_source
     origin_base = File.basename(@pdf_source)
     File.dirname(pdf).split(origin_base)[1] || '/'
   end
