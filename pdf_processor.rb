@@ -51,22 +51,26 @@ module PDFToTextFile
 
   attr_accessor :pdf_source, :options, :logger
 
-  module_function
-  def process_pdf(pdf_source, options = {})
+  #module_function
+  def self.process_pdf(pdf_source, options = {})
     @pdf_source = pdf_source
     @options = options
-    validate_options
+    self.validate_options
     fail "File is not a pdf: #{@pdf_source}" unless File.extname(@pdf_source) == '.pdf'
-    process_pdf_with_options(@pdf_source)
+    self.process_pdf_with_options(@pdf_source)
   end
 
-  def process_dir(pdf_source, options = {})
+  def self.process_dir(pdf_source, options = {})
     @pdf_source = pdf_source
     @options = options
-    validate_options
+    self.validate_options
     fail "Argument is not a directory: #{@pdf_source}" unless File.directory?(@pdf_source)
-    process_dir_with_options
+    self.process_dir_with_options
   end
+
+
+  #TODO: remove instance variables and pass arguments to allow protected
+  protected
 
   def validate_options
     fail 'You must specify a filename or directory.' if @pdf_source.nil?
