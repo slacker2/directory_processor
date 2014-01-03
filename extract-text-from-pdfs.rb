@@ -1,5 +1,5 @@
 require 'fileutils'
-require './lib/pdf-processor'
+require './lib/pdf-text-extractor'
 
 ARCHIVE_DIR = 'archive'
 RESULTS_DIR = 'text_results'
@@ -16,7 +16,7 @@ def main
       FileUtils.mkdir_p(RESULTS_DIR)
       FileUtils.mkdir_p(ARCHIVE_DIR)
       FileUtils.mkdir_p(LOGS_DIR)
-      puts PDFToTextFile.process_file(arg, {output_dest: RESULTS_DIR,
+      puts PDFToTextFile.process_pdf(arg, {output_dest: RESULTS_DIR,
                                             archive_dest: ARCHIVE_DIR ,
                                             log_file: LOG_FILE})
     elsif File.directory?(arg)
